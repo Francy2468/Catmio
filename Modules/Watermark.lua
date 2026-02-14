@@ -2,7 +2,7 @@
 local Module = {}
 
 function Module.Process()
-   return "--[[Zen v1.0.2 | Doesnt Use AST]]--\n"
+   return "--[[Cadmio v1.0.0| https://discord.gg/SEyVaCzhYt]--\n"
 end
 
 return Module
