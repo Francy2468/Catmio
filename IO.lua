@@ -5,16 +5,8 @@ local IO = {}
 
 -- // Banner \\ --
 local function PrintBanner()
-    print([[
- ________  _______   ________     
-|\_____  \|\  ___ \ |\   ___  \   
- \|___/  /\ \   __/|\ \  \\ \  \  
-     /  / /\ \  \_|/_\ \  \\ \  \ 
-    /  /_/__\ \  \_|\ \ \  \\ \  \
-   |\________\ \_______\ \__\\ \__\
-    \|_______|\|_______|\|__| \|__|
-                                   
-    Zen Obfuscator v1.0.2
+    print([[ Catmio Obfuscator v1.0.0
+        https://discord.gg/SEyVaCzhYt
     ----------------------
     ]])
 end
