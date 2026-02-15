@@ -3,7 +3,7 @@ local Config = {
       ["Enabled"] = true
    },
    ["Junk_Injection"] = {
-      ["Amount"] = 80, -- Eats alot of register 
+      ["Amount"] = 8990, -- Eats alot of register 
       ["Enabled"] = true
    },
    ["Closure_Wrap"] = {
