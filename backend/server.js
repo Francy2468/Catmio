@@ -50,7 +50,7 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const PORT = parseInt(process.env.PORT, 10) || 3001;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Catmio backend listening on port ${PORT}`);
 });
 
