@@ -30,22 +30,35 @@ app.use(
 app.use(express.json({ limit: '1mb' }));
 
 // Serve Next.js static export (built frontend).
-// Placed before the rate-limiter so that fetching page assets (JS, CSS, images)
-// doesn't consume the user's API quota, and before any explicit route handlers
-// so the static index.html is returned for the root path without needing a
-// dedicated '/' handler.  If the build hasn't run yet (e.g. in a bare dev
-// clone) the middleware simply passes through and the API fallback routes take
-// over.
-const frontendBuildPath = path.join(__dirname, '../frontend/out');
-const indexHtmlPath = path.join(frontendBuildPath, 'index.html');
-const hasFrontendBuild = fs.existsSync(indexHtmlPath);
+// We resolve multiple candidate paths because some platforms run the service
+// from different working directories during deploy/runtime.
+const frontendBuildCandidates = [
+  path.resolve(__dirname, '../frontend/out'),
+  path.resolve(process.cwd(), 'frontend/out'),
+  path.resolve(process.cwd(), 'out'),
+  path.resolve(__dirname, 'out'),
+  path.resolve(__dirname, 'public'),
+];
+
+const frontendBuildPath = frontendBuildCandidates.find((candidatePath) =>
+  fs.existsSync(path.join(candidatePath, 'index.html'))
+);
+
+const hasFrontendBuild = Boolean(frontendBuildPath);
+const indexHtmlPath = hasFrontendBuild
+  ? path.join(frontendBuildPath, 'index.html')
+  : null;
 if (!hasFrontendBuild) {
   console.warn(
-    `[warn] Frontend build not found at ${frontendBuildPath}. ` +
+    `[warn] Frontend build not found in any known path: ${frontendBuildCandidates.join(', ')}. ` +
       'Run "npm run build:frontend" from the repo root to generate it.'
   );
+} else {
+  console.log(`[info] Serving frontend build from ${frontendBuildPath}`);
 }
-app.use(express.static(frontendBuildPath));
+if (hasFrontendBuild) {
+  app.use(express.static(frontendBuildPath));
+}
 
 app.use(apiLimiter);
 
@@ -55,30 +68,16 @@ app.get('/health', (req, res) => {
 });
 
 // Root route: serve the web app when available. If the frontend build is
-// missing, return a helpful HTML status page instead of a 404 JSON error.
+// missing, fail fast with 503 so deployment issues are immediately visible.
 app.get('/', (req, res) => {
   if (hasFrontendBuild) {
     return res.sendFile(indexHtmlPath);
   }
 
-  res.status(200).send(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Catmio API</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 2rem; color: #111; }
-      code { background: #f3f3f3; padding: 0.1rem 0.25rem; border-radius: 4px; }
-    </style>
-  </head>
-  <body>
-    <h1>Catmio backend is running</h1>
-    <p>The frontend build was not found on this deployment.</p>
-    <p>Health check: <a href="/health">/health</a></p>
-    <p>API base: <code>/api/*</code></p>
-  </body>
-</html>`);
+  res.status(503).json({
+    error: 'Frontend build missing',
+    message: 'This deployment is unhealthy: static frontend was not generated.',
+  });
 });
 
 // API routes
@@ -97,7 +96,16 @@ app.use('*', (req, res, next) => {
   if (hasFrontendBuild) {
     return res.sendFile(indexHtmlPath);
   }
-  next();
+
+  // Keep API 404 behavior intact, but fail-fast for web routes.
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
+  return res.status(503).json({
+    error: 'Frontend build missing',
+    message: 'This deployment is unhealthy: static frontend was not generated.',
+  });
 });
 
 // 404 handler for unknown routes

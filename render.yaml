@@ -3,7 +3,7 @@ services:
   - type: web
     name: catmio
     runtime: node
-    buildCommand: npm install && npm run build:frontend
+    buildCommand: npm install && npm run build:frontend && test -f frontend/out/index.html
     startCommand: npm start
     healthCheckPath: /health
     envVars:
