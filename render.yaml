@@ -21,5 +21,7 @@ services:
         sync: false
       - key: EMAIL_PASS
         sync: false
+      - key: FRONTEND_URL
+        sync: false
       - key: OBFUSCATOR_API_KEY
         sync: false

@@ -18,12 +18,33 @@ const loaderRoutes = require('./routes/loader');
 
 const app = express();
 
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Security & parsing middleware
 app.set('trust proxy', 1);
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*',
+    origin(origin, callback) {
+      // Allow non-browser requests (no Origin header), like Render health checks.
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // If no FRONTEND_URL is configured, allow requests (useful for same-origin deploys).
+      if (allowedOrigins.length === 0) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(Object.assign(new Error('Not allowed by CORS'), { status: 403 }));
+    },
     credentials: true,
   })
 );
