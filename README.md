@@ -1,1 +1,203 @@
-# Catmio0
+# Catmio — Script Protection & Analytics SaaS
+
+Catmio is a full-stack SaaS platform for script developers to protect, track, and manage their scripts. It provides script obfuscation, execution logging with HWID tracking, webhook notifications, and a full admin panel.
+
+## Features
+
+- **Script Protection** — Integrate with an obfuscator to protect Lua/Python scripts
+- **Execution Logging** — Track every script execution (HWID, IP, game name, timestamp)
+- **HWID Ban System** — Ban/unban Hardware IDs to prevent unauthorized usage
+- **Webhook Notifications** — Get notified on every execution via configurable webhooks
+- **User Dashboard** — Overview, executions table, obfuscator, settings, support
+- **Admin Panel** — Manage users, view analytics, ban users/HWIDs
+- **Script Loader API** — Secure endpoint for loading scripts with HWID verification
+- **Documentation** — Built-in docs, terms of service, and privacy policy pages
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Node.js, Express.js |
+| Database | PostgreSQL (Supabase) |
+| Frontend | Next.js 14, React, Tailwind CSS |
+| Auth | JWT, bcryptjs, email verification |
+| Charts | Chart.js + react-chartjs-2 |
+| Email | Nodemailer |
+
+## Project Structure
+
+```
+catmio/
+├── backend/
+│   ├── controllers/     # Route handlers
+│   ├── routes/          # Express routers
+│   ├── middleware/       # Auth, rate limiting, error handling
+│   ├── services/         # Email service
+│   ├── database/         # DB connection
+│   └── server.js
+├── frontend/
+│   ├── pages/           # Next.js pages
+│   ├── components/       # Reusable UI components
+│   ├── layouts/          # Page layouts
+│   ├── lib/              # API client, auth helpers
+│   └── styles/
+├── .env.example
+└── README.md
+```
+
+## Database Setup
+
+Run the following SQL in your Supabase SQL editor:
+
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  verified BOOLEAN DEFAULT FALSE,
+  verification_token TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  hwid TEXT,
+  is_banned BOOLEAN DEFAULT FALSE,
+  hwid_banned BOOLEAN DEFAULT FALSE,
+  role TEXT DEFAULT 'user',
+  webhook_url TEXT
+);
+
+CREATE TABLE executions (
+  id SERIAL PRIMARY KEY,
+  user_id INT REFERENCES users(id),
+  ip_address TEXT,
+  hwid TEXT,
+  script_name TEXT,
+  game_name TEXT,
+  executed_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values.
+
+### Backend (`backend/.env`)
+
+```
+DATABASE_URL=postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres
+JWT_SECRET=your-strong-random-secret
+FRONTEND_URL=https://your-frontend-domain.vercel.app
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your@email.com
+EMAIL_PASS=your-app-password
+OBFUSCATOR_API_KEY=your-obfuscator-api-key
+PORT=3001
+```
+
+### Frontend (`frontend/.env.local`)
+
+```
+NEXT_PUBLIC_API_URL=https://your-backend-domain.railway.app
+```
+
+## Local Development
+
+### Backend
+
+```bash
+cd backend
+npm install
+cp ../.env.example .env   # fill in values
+npm run dev
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+# create .env.local with NEXT_PUBLIC_API_URL
+npm run dev
+```
+
+## Deployment
+
+### Backend — Render / Railway
+
+1. Connect your GitHub repo
+2. Set root directory to `backend`
+3. Build command: `npm install`
+4. Start command: `npm start`
+5. Add all environment variables
+
+### Frontend — Vercel / Railway
+
+1. Connect your GitHub repo
+2. Set root directory to `frontend`
+3. Build command: `npm run build`
+4. Start command: `npm start`
+5. Set `NEXT_PUBLIC_API_URL` to your backend URL
+
+## API Endpoints
+
+### Auth
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login |
+| GET | `/api/auth/verify-email?token=` | Verify email |
+| GET | `/api/auth/profile` | Get profile (auth required) |
+| PUT | `/api/auth/profile` | Update profile (auth required) |
+
+### Executions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/executions` | Log an execution (auth required) |
+| GET | `/api/executions` | List executions (auth required) |
+| GET | `/api/executions/stats` | Execution stats (auth required) |
+
+### Obfuscator
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/obfuscator` | Obfuscate code (auth required) |
+
+### Webhook
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| PUT | `/api/webhook/url` | Update webhook URL (auth required) |
+| POST | `/api/webhook/test` | Test webhook (auth required) |
+
+### Loader
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/loader/:script_id` | Load script with HWID verification |
+
+### Admin (role=admin required)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/users` | List all users |
+| POST | `/api/admin/users/:id/ban` | Ban user |
+| POST | `/api/admin/users/:id/unban` | Unban user |
+| POST | `/api/admin/users/:id/ban-hwid` | Ban user's HWID |
+| POST | `/api/admin/users/:id/unban-hwid` | Unban user's HWID |
+| POST | `/api/admin/users/:id/reset-hwid` | Reset user's HWID |
+| GET | `/api/admin/analytics` | Platform analytics |
+| GET | `/api/admin/executions` | All executions |
+
+## Security
+
+- All passwords hashed with bcrypt (12 rounds)
+- JWT tokens expire after 7 days
+- Rate limiting on auth endpoints (10 req/15 min)
+- HWID verification on execution and script loading
+- SQL injection prevention via parameterized queries
+- CORS restricted to configured frontend URL
+- Helmet.js security headers
+
+## Support
+
+Contact: catmiosupport@gmail.com  
+Response time: 24–48 hours
+
+## License
+
+MIT
