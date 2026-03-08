@@ -141,7 +141,7 @@ A `render.yaml` Blueprint file is included at the root of this repository. This 
 
 1. Connect your GitHub repo
 2. Set root directory to repo root (`catmio/`)
-3. Build command: `npm install && npm run build:frontend && test -f frontend/out/index.html`
+3. Build command: `npm install && test -f frontend/out/index.html`
 4. Start command: `npm start`
 5. Add all required environment variables
 
