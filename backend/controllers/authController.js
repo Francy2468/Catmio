@@ -177,6 +177,14 @@ async function googleAuth(req, res, next) {
 }
 
 /**
+ * GET /api/auth/google-config
+ */
+function getGoogleConfig(req, res) {
+  const clientId = process.env.GOOGLE_CLIENT_ID || '';
+  return res.json({ enabled: Boolean(clientId), clientId });
+}
+
+/**
  * GET /api/auth/verify-email?token=<uuid>
  */
 async function verifyEmail(req, res, next) {
@@ -297,4 +305,4 @@ async function updateProfile(req, res, next) {
   }
 }
 
-module.exports = { register, login, googleAuth, verifyEmail, getProfile, updateProfile };
+module.exports = { register, login, googleAuth, getGoogleConfig, verifyEmail, getProfile, updateProfile };

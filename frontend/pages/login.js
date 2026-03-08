@@ -12,9 +12,27 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false)
+  const [googleClientId, setGoogleClientId] = useState('')
   const googleButtonRef = useRef(null)
 
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
+  useEffect(() => {
+    let isMounted = true
+    api
+      .get('/api/auth/google-config')
+      .then(({ data }) => {
+        if (!isMounted) return
+        if (data?.enabled && typeof data.clientId === 'string') {
+          setGoogleClientId(data.clientId)
+        }
+      })
+      .catch(() => {
+        // Silent failure keeps email/password auth working.
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!googleClientId) return

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { register, login, googleAuth, verifyEmail, getProfile, updateProfile } = require('../controllers/authController');
+const { register, login, googleAuth, getGoogleConfig, verifyEmail, getProfile, updateProfile } = require('../controllers/authController');
 const authMiddleware = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimit');
 
@@ -8,6 +8,7 @@ const router = Router();
 router.post('/register', authLimiter, register);
 router.post('/login', authLimiter, login);
 router.post('/google', authLimiter, googleAuth);
+router.get('/google-config', getGoogleConfig);
 router.get('/verify-email', verifyEmail);
 router.get('/profile', authMiddleware, getProfile);
 router.put('/profile', authMiddleware, updateProfile);

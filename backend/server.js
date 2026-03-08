@@ -5,6 +5,7 @@ const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const { ensureDatabaseSchema } = require('./database');
 
 const { apiLimiter } = require('./middleware/rateLimit');
 const errorHandler = require('./middleware/errorHandler');
@@ -25,7 +26,20 @@ const allowedOrigins = (process.env.FRONTEND_URL || '')
 
 // Security & parsing middleware
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        scriptSrc: ["'self'", 'https://accounts.google.com'],
+        frameSrc: ["'self'", 'https://accounts.google.com'],
+        connectSrc: ["'self'", 'https://accounts.google.com'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin(origin, callback) {
@@ -138,8 +152,19 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 const PORT = parseInt(process.env.PORT, 10) || 3001;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Catmio backend listening on port ${PORT}`);
-});
+
+async function startServer() {
+  try {
+    await ensureDatabaseSchema();
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Catmio backend listening on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to initialize database schema:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 module.exports = app;
