@@ -1,10 +1,9 @@
 services:
-  # ── Backend (Express API) ──────────────────────────────────────────────────
+  # ── Unified service (Express API + Next.js static frontend) ──────────────
   - type: web
-    name: catmio-backend
+    name: catmio
     runtime: node
-    rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && npm run build:frontend
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -14,8 +13,6 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: FRONTEND_URL
-        sync: false
       - key: EMAIL_HOST
         sync: false
       - key: EMAIL_PORT
@@ -25,17 +22,4 @@ services:
       - key: EMAIL_PASS
         sync: false
       - key: OBFUSCATOR_API_KEY
-        sync: false
-
-  # ── Frontend (Next.js) ────────────────────────────────────────────────────
-  - type: web
-    name: catmio-frontend
-    runtime: node
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NEXT_PUBLIC_API_URL
         sync: false
