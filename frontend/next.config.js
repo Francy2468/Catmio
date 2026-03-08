@@ -13,6 +13,7 @@ const nextConfig = {
     // URL (e.g. http://localhost:3001) only when running the Next.js dev server
     // separately from the backend.
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
   },
 }
 module.exports = nextConfig

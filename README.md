@@ -90,6 +90,9 @@ EMAIL_PORT=587
 EMAIL_USER=your@email.com
 EMAIL_PASS=your-app-password
 OBFUSCATOR_API_KEY=your-obfuscator-api-key
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 PORT=3001
 ```
 
@@ -152,6 +155,7 @@ A `render.yaml` Blueprint file is included at the root of this repository. This 
 |--------|----------|-------------|
 | POST | `/api/auth/register` | Register new user |
 | POST | `/api/auth/login` | Login |
+| POST | `/api/auth/google` | Register/Login with Google ID token |
 | GET | `/api/auth/verify-email?token=` | Verify email |
 | GET | `/api/auth/profile` | Get profile (auth required) |
 | PUT | `/api/auth/profile` | Update profile (auth required) |

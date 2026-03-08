@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Script from 'next/script'
 import { useRouter } from 'next/router'
 import api from '../lib/api'
 import { setToken } from '../lib/auth'
@@ -9,6 +10,45 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false)
+  const googleButtonRef = useRef(null)
+
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
+
+  useEffect(() => {
+    if (!googleClientId) return
+    if (!googleScriptLoaded) return
+    if (typeof window === 'undefined' || !window.google || !googleButtonRef.current) return
+
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: async (response) => {
+        if (!response?.credential) return
+        setError('')
+        setGoogleLoading(true)
+        try {
+          const { data } = await api.post('/api/auth/google', { token: response.credential })
+          setToken(data.token)
+          router.push('/dashboard')
+        } catch (err) {
+          setError(err.response?.data?.error || 'Google sign-in failed.')
+        } finally {
+          setGoogleLoading(false)
+        }
+      },
+    })
+
+    googleButtonRef.current.innerHTML = ''
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      type: 'standard',
+      shape: 'pill',
+      size: 'large',
+      text: 'signin_with',
+      theme: 'outline',
+      width: 320,
+    })
+  }, [googleClientId, googleScriptLoaded, router])
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
@@ -21,7 +61,7 @@ export default function Login() {
       setToken(data.token)
       router.push('/dashboard')
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password.')
+      setError(err.response?.data?.error || 'Invalid email or password.')
     } finally {
       setLoading(false)
     }
@@ -37,6 +77,30 @@ export default function Login() {
 
         <div className="bg-[#1e293b] border border-white/10 rounded-2xl p-8">
           <h1 className="text-2xl font-bold mb-6">Sign In</h1>
+
+          {googleClientId && (
+            <>
+              <Script
+                src="https://accounts.google.com/gsi/client"
+                strategy="afterInteractive"
+                onLoad={() => setGoogleScriptLoaded(true)}
+              />
+              <div className="mb-5 flex justify-center">
+                <div ref={googleButtonRef} />
+              </div>
+              {googleLoading && (
+                <p className="text-center text-sm text-gray-400 mb-4">Signing in with Google...</p>
+              )}
+              <div className="relative mb-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-[#1e293b] px-2 text-gray-500">or continue with email</span>
+                </div>
+              </div>
+            </>
+          )}
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-4 py-3 mb-6 text-sm">

@@ -1,8 +1,19 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const { OAuth2Client } = require('google-auth-library');
 const { query } = require('../database');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../services/emailService');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+function createAuthToken(user) {
+  return jwt.sign(
+    { id: user.id, email: user.email, role: user.role },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
 
 /**
  * POST /api/auth/register
@@ -83,14 +94,84 @@ async function login(req, res, next) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = createAuthToken(user);
 
     return res.json({ token, user: { id: user.id, email: user.email, role: user.role } });
   } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /api/auth/google
+ * Body: { token }
+ */
+async function googleAuth(req, res, next) {
+  try {
+    const { token } = req.body;
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'Google auth is not configured' });
+    }
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Google token is required' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload || !payload.email) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
+    if (!payload.email_verified) {
+      return res.status(403).json({ error: 'Google email is not verified' });
+    }
+
+    const email = payload.email.toLowerCase();
+    const existing = await query(
+      'SELECT id, email, role, verified, is_banned FROM users WHERE email = $1',
+      [email]
+    );
+
+    let user;
+    if (existing.rows.length > 0) {
+      user = existing.rows[0];
+
+      if (user.is_banned) {
+        return res.status(403).json({ error: 'Your account has been banned' });
+      }
+
+      if (!user.verified) {
+        await query('UPDATE users SET verified = true, verification_token = NULL WHERE id = $1', [user.id]);
+        user.verified = true;
+      }
+    } else {
+      const randomPasswordHash = await bcrypt.hash(uuidv4(), 12);
+      const inserted = await query(
+        `INSERT INTO users (email, password_hash, verification_token, role, is_banned, verified, created_at)
+         VALUES ($1, $2, NULL, 'user', false, true, NOW())
+         RETURNING id, email, role, verified, is_banned`,
+        [email, randomPasswordHash]
+      );
+      user = inserted.rows[0];
+
+      try {
+        await sendWelcomeEmail(user.email);
+      } catch (emailErr) {
+        console.error('Failed to send welcome email for Google sign-in:', emailErr.message);
+      }
+    }
+
+    const authToken = createAuthToken(user);
+    return res.json({ token: authToken, user: { id: user.id, email: user.email, role: user.role } });
+  } catch (err) {
+    if (err.message && err.message.toLowerCase().includes('token used too early')) {
+      return res.status(401).json({ error: 'Invalid Google token' });
+    }
     next(err);
   }
 }
@@ -216,4 +297,4 @@ async function updateProfile(req, res, next) {
   }
 }
 
-module.exports = { register, login, verifyEmail, getProfile, updateProfile };
+module.exports = { register, login, googleAuth, verifyEmail, getProfile, updateProfile };
