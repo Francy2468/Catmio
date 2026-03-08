@@ -54,6 +54,33 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+// Root route: serve the web app when available. If the frontend build is
+// missing, return a helpful HTML status page instead of a 404 JSON error.
+app.get('/', (req, res) => {
+  if (hasFrontendBuild) {
+    return res.sendFile(indexHtmlPath);
+  }
+
+  res.status(200).send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Catmio API</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 2rem; color: #111; }
+      code { background: #f3f3f3; padding: 0.1rem 0.25rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <h1>Catmio backend is running</h1>
+    <p>The frontend build was not found on this deployment.</p>
+    <p>Health check: <a href="/health">/health</a></p>
+    <p>API base: <code>/api/*</code></p>
+  </body>
+</html>`);
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/executions', executionRoutes);
