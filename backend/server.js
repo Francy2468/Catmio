@@ -33,6 +33,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
+// Root route – redirect to the frontend or return API info
+app.get('/', (req, res) => {
+  if (process.env.FRONTEND_URL) {
+    return res.redirect(302, process.env.FRONTEND_URL);
+  }
+  const { version } = require('./package.json');
+  res.json({ name: 'Catmio API', status: 'running', version });
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/executions', executionRoutes);
