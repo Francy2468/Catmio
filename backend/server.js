@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
@@ -36,7 +37,9 @@ app.use(express.json({ limit: '1mb' }));
 // clone) the middleware simply passes through and the API fallback routes take
 // over.
 const frontendBuildPath = path.join(__dirname, '../frontend/out');
-if (!require('fs').existsSync(frontendBuildPath)) {
+const indexHtmlPath = path.join(frontendBuildPath, 'index.html');
+const hasFrontendBuild = fs.existsSync(indexHtmlPath);
+if (!hasFrontendBuild) {
   console.warn(
     `[warn] Frontend build not found at ${frontendBuildPath}. ` +
       'Run "npm run build:frontend" from the repo root to generate it.'
@@ -51,17 +54,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// Root route – redirect to the frontend URL if configured (useful when
-// the frontend is deployed separately and FRONTEND_URL is set), otherwise
-// let the static middleware above handle it.
-app.get('/', (req, res) => {
-  if (process.env.FRONTEND_URL) {
-    return res.redirect(302, process.env.FRONTEND_URL);
-  }
-  const { version } = require('./package.json');
-  res.json({ name: 'Catmio API', status: 'running', version });
-});
-
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/executions', executionRoutes);
@@ -69,6 +61,17 @@ app.use('/api/obfuscator', obfuscatorRoutes);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/loader', loaderRoutes);
+
+// SPA fallback – serve the frontend's index.html for any route that isn't
+// an API endpoint or a static asset already handled above.  This lets
+// Next.js client-side routing work correctly when users navigate directly
+// to a URL (e.g. /login, /dashboard) or refresh the page.
+app.use('*', (req, res, next) => {
+  if (hasFrontendBuild) {
+    return res.sendFile(indexHtmlPath);
+  }
+  next();
+});
 
 // 404 handler for unknown routes
 app.use((req, res) => {
