@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -26,6 +27,23 @@ app.use(
   })
 );
 app.use(express.json({ limit: '1mb' }));
+
+// Serve Next.js static export (built frontend).
+// Placed before the rate-limiter so that fetching page assets (JS, CSS, images)
+// doesn't consume the user's API quota, and before any explicit route handlers
+// so the static index.html is returned for the root path without needing a
+// dedicated '/' handler.  If the build hasn't run yet (e.g. in a bare dev
+// clone) the middleware simply passes through and the API fallback routes take
+// over.
+const frontendBuildPath = path.join(__dirname, '../frontend/out');
+if (!require('fs').existsSync(frontendBuildPath)) {
+  console.warn(
+    `[warn] Frontend build not found at ${frontendBuildPath}. ` +
+      'Run "npm run build:frontend" from the repo root to generate it.'
+  );
+}
+app.use(express.static(frontendBuildPath));
+
 app.use(apiLimiter);
 
 // Health check (before auth / rate-limit for monitoring systems)
@@ -33,7 +51,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });
 });
 
-// Root route – redirect to the frontend or return API info
+// Root route – redirect to the frontend URL if configured (useful when
+// the frontend is deployed separately and FRONTEND_URL is set), otherwise
+// let the static middleware above handle it.
 app.get('/', (req, res) => {
   if (process.env.FRONTEND_URL) {
     return res.redirect(302, process.env.FRONTEND_URL);

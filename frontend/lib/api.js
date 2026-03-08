@@ -2,7 +2,10 @@ import axios from 'axios'
 import { getToken, removeToken } from './auth'
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
+  // Empty string → relative URLs.  When frontend and backend share the same
+  // domain (unified Render service) this means API calls go to the same origin.
+  // Override with NEXT_PUBLIC_API_URL when running the dev servers separately.
+  baseURL: process.env.NEXT_PUBLIC_API_URL || '',
 })
 
 api.interceptors.request.use((config) => {
