@@ -1,0 +1,12 @@
+{
+  "name": "catmio",
+  "version": "1.0.0",
+  "description": "Catmio SaaS – monorepo root",
+  "private": true,
+  "scripts": {
+    "postinstall": "cd backend && npm install",
+    "start": "cd backend && node server.js",
+    "build:frontend": "cd frontend && npm install && npm run build",
+    "start:frontend": "cd frontend && npm start"
+  }
+}
