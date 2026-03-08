@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const axios = require('axios');
 const { query } = require('../database');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../services/emailService');
 
@@ -76,6 +77,11 @@ async function login(req, res, next) {
     }
     if (user.is_banned) {
       return res.status(403).json({ error: 'Your account has been banned' });
+    }
+
+    // Google-only accounts have no password hash
+    if (!user.password_hash) {
+      return res.status(400).json({ error: 'This account uses Google Sign-In. Please use the "Sign in with Google" button.' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
@@ -216,4 +222,103 @@ async function updateProfile(req, res, next) {
   }
 }
 
-module.exports = { register, login, verifyEmail, getProfile, updateProfile };
+/**
+ * GET /api/auth/google
+ * Redirects the browser to Google's OAuth consent screen.
+ */
+function googleAuth(req, res) {
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: process.env.GOOGLE_CALLBACK_URL,
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    prompt: 'select_account',
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}
+
+/**
+ * GET /api/auth/google/callback
+ * Google redirects here with ?code=… after the user grants access.
+ */
+async function googleCallback(req, res, next) {
+  try {
+    const { code, error } = req.query;
+
+    const frontendUrl = (process.env.FRONTEND_URL || '').split(',')[0].trim();
+
+    if (error || !code) {
+      return res.redirect(`${frontendUrl}/login?error=google_denied`);
+    }
+
+    // Exchange authorization code for tokens
+    const tokenRes = await axios.post(
+      'https://oauth2.googleapis.com/token',
+      new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: process.env.GOOGLE_CALLBACK_URL,
+        grant_type: 'authorization_code',
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+
+    const { access_token } = tokenRes.data;
+
+    // Fetch the authenticated user's Google profile
+    const profileRes = await axios.get(
+      'https://www.googleapis.com/oauth2/v2/userinfo',
+      { headers: { Authorization: `Bearer ${access_token}` } }
+    );
+
+    const { id: googleId, email } = profileRes.data;
+
+    if (!email) {
+      return res.redirect(`${frontendUrl}/login/?error=google_no_email`);
+    }
+
+    // Look up or create the user in the database
+    let result = await query(
+      'SELECT id, email, role, is_banned FROM users WHERE email = $1 OR google_id = $2',
+      [email.toLowerCase(), googleId]
+    );
+
+    let user;
+    if (result.rows.length === 0) {
+      // New user – create account (email already verified via Google)
+      const insertResult = await query(
+        `INSERT INTO users (email, password_hash, google_id, verified, role, is_banned, created_at)
+         VALUES ($1, NULL, $2, true, 'user', false, NOW())
+         RETURNING id, email, role, is_banned`,
+        [email.toLowerCase(), googleId]
+      );
+      user = insertResult.rows[0];
+      try { await sendWelcomeEmail(email.toLowerCase()); } catch (_) { /* non-fatal */ }
+    } else {
+      user = result.rows[0];
+      // Store google_id if this is the first Google login for an existing account
+      await query(
+        'UPDATE users SET google_id = $1, verified = true WHERE id = $2 AND google_id IS NULL',
+        [googleId, user.id]
+      );
+    }
+
+    if (user.is_banned) {
+      return res.redirect(`${frontendUrl}/login?error=banned`);
+    }
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, verifyEmail, getProfile, updateProfile, googleAuth, googleCallback };
